@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /*
  * This code has not been reviewed.
  * Do not use or deploy this code before reviewing it personally first.
@@ -25,6 +26,7 @@ interface IERC1400 is IERC20, IERC1643 {
   // *************** Partition Token Transfers ****************
   function transferByPartition(bytes32 partition, address to, uint256 value, bytes calldata data) external returns (bytes32);
   function operatorTransferByPartition(bytes32 partition, address from, address to, uint256 value, bytes calldata data, bytes calldata operatorData) external returns (bytes32);
+  function allowanceByPartition(bytes32 partition, address owner, address spender) external view returns (uint256);
 
   // ****************** Controller Operation ******************
   function isControllable() external view returns (bool);

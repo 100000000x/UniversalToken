@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 /*
  * This code has not been reviewed.
  * Do not use or deploy this code before reviewing it personally first.
@@ -13,6 +14,7 @@ import "../../roles/CertificateSignerRole.sol";
 import "../../roles/AllowlistedRole.sol";
 import "../../roles/BlocklistedRole.sol";
 
+import "../../interface/IHoldableERC1400TokenExtension.sol";
 import "../../tools/ERC1820Client.sol";
 import "../../tools/DomainAware.sol";
 import "../../interface/ERC1820Implementer.sol";
@@ -29,7 +31,7 @@ interface IMinterRole {
 }
 
 
-contract ERC1400TokensValidator is IERC1400TokensValidator, Pausable, CertificateSignerRole, AllowlistedRole, BlocklistedRole, ERC1820Client, ERC1820Implementer {
+contract ERC1400TokensValidator is IERC1400TokensValidator, Pausable, CertificateSignerRole, AllowlistedRole, BlocklistedRole, ERC1820Client, ERC1820Implementer, IHoldableERC1400TokenExtension {
   using SafeMath for uint256;
 
   string constant internal ERC1400_TOKENS_VALIDATOR = "ERC1400TokensValidator";
@@ -71,16 +73,6 @@ contract ERC1400TokensValidator is IERC1400TokensValidator, Pausable, Certificat
 
   // Mapping from token to holds activation status.
   mapping(address => bool) internal _holdsActivated;
-
-  enum HoldStatusCode {
-    Nonexistent,
-    Ordered,
-    Executed,
-    ExecutedAndKeptOpen,
-    ReleasedByNotary,
-    ReleasedByPayee,
-    ReleasedOnExpiration
-  }
 
   struct Hold {
     bytes32 partition;
@@ -478,9 +470,9 @@ contract ERC1400TokensValidator is IERC1400TokensValidator, Pausable, Certificat
     if (_holdsActivated[token] && from != address(0)) {
       if(operator != from) {
         (, bytes32 holdId) = _retrieveHoldHashId(token, partition, operator, from, to, value);
-        Hold storage hold = _holds[token][holdId];
+        Hold storage hold_ = _holds[token][holdId];
         
-        if (_holdCanBeExecutedAsNotary(hold, operator, value) && value <= IERC1400(token).balanceOfByPartition(partition, from)) {
+        if (_holdCanBeExecutedAsNotary(hold_, operator, value) && value <= IERC1400(token).balanceOfByPartition(partition, from)) {
           return true;
         }
       }
@@ -886,8 +878,8 @@ contract ERC1400TokensValidator is IERC1400TokensValidator, Pausable, Certificat
   /**
    * @dev Execute hold.
    */
-  function executeHold(address token, bytes32 holdId, uint256 value, bytes32 secret) external returns (bool) {
-    return _executeHold(
+  function executeHold(address token, bytes32 holdId, uint256 value, bytes32 secret) external override {
+    _executeHold(
       token,
       holdId,
       msg.sender,
@@ -900,8 +892,8 @@ contract ERC1400TokensValidator is IERC1400TokensValidator, Pausable, Certificat
   /**
    * @dev Execute hold and keep open.
    */
-  function executeHoldAndKeepOpen(address token, bytes32 holdId, uint256 value, bytes32 secret) external returns (bool) {
-    return _executeHold(
+  function executeHoldAndKeepOpen(address token, bytes32 holdId, uint256 value, bytes32 secret) external {
+    _executeHold(
       token,
       holdId,
       msg.sender,
@@ -921,7 +913,7 @@ contract ERC1400TokensValidator is IERC1400TokensValidator, Pausable, Certificat
     uint256 value,
     bytes32 secret,
     bool keepOpenIfHoldHasBalance
-  ) internal returns (bool)
+  ) internal
   {
     Hold storage executableHold = _holds[token][holdId];
 
@@ -1026,7 +1018,7 @@ contract ERC1400TokensValidator is IERC1400TokensValidator, Pausable, Certificat
   /**
    * @dev Increase held balance.
    */
-  function _increaseHeldBalance(address token, Hold storage executableHold, bytes32 holdId) private {
+  function _increaseHeldBalance(address token, Hold storage executableHold, bytes32/*holdId*/) private {
     _heldBalance[token][executableHold.sender] = _heldBalance[token][executableHold.sender].add(executableHold.value);
     _totalHeldBalance[token] = _totalHeldBalance[token].add(executableHold.value);
 
@@ -1147,7 +1139,7 @@ contract ERC1400TokensValidator is IERC1400TokensValidator, Pausable, Certificat
   /**
    * @dev Retrieve hold data.
    */
-  function retrieveHoldData(address token, bytes32 holdId) external view returns (
+  function retrieveHoldData(address token, bytes32 holdId) external override view returns (
     bytes32 partition,
     address sender,
     address recipient,
